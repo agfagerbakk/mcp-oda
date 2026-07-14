@@ -140,6 +140,37 @@ export class OdaServer {
       await this.getClient().removeRecipeFromCart(id);
       return this.textResult("Recipe removed");
     }));
+
+    this.mcpServer.registerTool("delivery_slots_list", {
+      description: "List available delivery slots. Returns slots with day/time windows, price, availability, and delivery addresses.",
+      inputSchema: {
+        num_days: z.number().optional(),
+        from_index: z.number().optional(),
+      },
+    }, this.toolHandler("delivery_slots_list", async ({ num_days, from_index }) => {
+      const data = await this.getClient().getDeliverySlots(num_days, from_index);
+      return this.jsonResult(data);
+    }));
+
+    this.mcpServer.registerTool("delivery_slot_select", {
+      description: "Select a delivery slot by slot ID.",
+      inputSchema: {
+        id: z.number(),
+        address_id: z.number().optional(),
+        unattended: z.boolean().optional(),
+      },
+    }, this.toolHandler("delivery_slot_select", async ({ id, address_id, unattended }) => {
+      await this.getClient().selectDeliverySlot(id, address_id, unattended);
+      return this.textResult("Delivery slot selected");
+    }));
+
+    this.mcpServer.registerTool("delivery_addresses_list", {
+      description: "List delivery addresses associated with the account.",
+      inputSchema: {},
+    }, this.toolHandler("delivery_addresses_list", async () => {
+      const data = await this.getClient().getDeliverySlots(1, 0);
+      return this.jsonResult(data.deliveryAddresses);
+    }));
   }
 
   async start() {

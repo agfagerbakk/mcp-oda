@@ -179,6 +179,47 @@ recipeCmd
     console.log("Recipe removed from cart.");
   });
 
+// --- slot commands ---
+const slotCmd = program.command("slot").description("Delivery slot commands");
+
+slotCmd
+  .command("list")
+  .description("List available delivery slots")
+  .option("--num-days <number>", "Number of days to fetch", "4")
+  .option("--from-index <number>", "Starting slot index", "0")
+  .action(async (cmdOpts) => {
+    const client = makeClient();
+    const result = await client.getDeliverySlots(
+      parseInt(cmdOpts.numDays),
+      parseInt(cmdOpts.fromIndex),
+    );
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+slotCmd
+  .command("select <id>")
+  .description("Select a delivery slot by ID")
+  .option("--address <id>", "Delivery address ID")
+  .option("--unattended", "Mark as unattended delivery", false)
+  .action(async (id: string, cmdOpts) => {
+    const client = makeClient();
+    await client.selectDeliverySlot(
+      parseInt(id),
+      cmdOpts.address ? parseInt(cmdOpts.address) : undefined,
+      cmdOpts.unattended,
+    );
+    console.log("Delivery slot selected.");
+  });
+
+slotCmd
+  .command("addresses")
+  .description("List delivery addresses")
+  .action(async () => {
+    const client = makeClient();
+    const result = await client.getDeliverySlots(1, 0);
+    console.log(JSON.stringify(result.deliveryAddresses, null, 2));
+  });
+
 // --- logs command ---
 program
   .command("logs")

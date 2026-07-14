@@ -52,3 +52,43 @@ export interface RecipeDetail {
   instructions: string[];
   image_url?: string;
 }
+
+export interface DeliveryAddress {
+  id: number;
+  addressDisplayFull: string;
+  isPrimary: boolean;
+  isDeliveryAvailable?: boolean;
+}
+
+export interface DeliverySlot {
+  id: number;
+  routeGroup: number;
+  routeGroupStr: string;
+  openDatetime: string;
+  closeDatetime: string;
+  cutoffTime: string;
+  isSelected: boolean;
+  isFull: boolean;
+  price: string;
+  isUnavailable: boolean;
+  unavailableDescription: string | null;
+  isCheapest: boolean;
+}
+
+export interface CartDeliveryInfo {
+  deliverySlot: number | null;
+  isUnattendedDelivery: boolean;
+  deliveryAddress: DeliveryAddress | null;
+  country: string;
+}
+
+export interface DeliverySlotsResponse {
+  deliverySlots: DeliverySlot[];
+  hasEarlier: boolean;
+  hasLater: boolean;
+  fromIndex: number;
+  cartInfo: CartDeliveryInfo;
+  deliveryAddresses: DeliveryAddress[];
+  validatorMessages: string[];
+  timeZone: string;
+}

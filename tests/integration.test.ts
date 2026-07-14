@@ -148,6 +148,25 @@ describe("Oda Integration Tests", () => {
       // Remove recipe from cart
       await authClient.removeRecipeFromCart(recipeId);
     }, 60000);
+
+    it("should list delivery slots", async () => {
+      const result = await authClient.getDeliverySlots(3, 0);
+      expect(Array.isArray(result.deliverySlots)).toBe(true);
+      expect(result.deliverySlots.length).toBeGreaterThan(0);
+      expect(typeof result.deliverySlots[0].id).toBe("number");
+      expect(typeof result.deliverySlots[0].price).toBe("string");
+      expect(typeof result.deliverySlots[0].isFull).toBe("boolean");
+      expect(result.timeZone).toBeTruthy();
+    }, 30000);
+
+    it("should list delivery addresses", async () => {
+      const result = await authClient.getDeliverySlots(1, 0);
+      expect(Array.isArray(result.deliveryAddresses)).toBe(true);
+      if (result.deliveryAddresses.length > 0) {
+        expect(typeof result.deliveryAddresses[0].id).toBe("number");
+        expect(typeof result.deliveryAddresses[0].addressDisplayFull).toBe("string");
+      }
+    }, 30000);
   });
 
   it("should dump page data", async () => {

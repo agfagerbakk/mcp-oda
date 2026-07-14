@@ -6,6 +6,7 @@ import {
   RecipeFilter,
   RecipePage,
   RecipeDetail,
+  DeliverySlotsResponse,
 } from "./types.js";
 import fs from "fs";
 
@@ -14,6 +15,8 @@ export class OdaClient {
   static API_BASE = "https://oda.com";
   static CART_API = "https://oda.com/api/v1/cart/";
   static CART_ITEMS_API = "https://oda.com/api/v1/cart/items/";
+  static SLOT_PICKER_API = "https://oda.com/api/v1/slot-picker/slots/";
+  static SLOT_SELECT_API = "https://oda.com/api/v1/slot-picker/info/";
 
   private cookies: Record<string, string> = {};
   private readonly headers: Record<string, string>;
@@ -568,6 +571,43 @@ export class OdaClient {
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Remove recipe from cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+  }
+
+  // --- Delivery slot methods ---
+
+  async getDeliverySlots(numDays = 4, fromIndex = 0): Promise<DeliverySlotsResponse> {
+    const url = `${OdaClient.SLOT_PICKER_API}?num-days=${numDays}&from-index=${fromIndex}`;
+    const response = await this.apiGet(url);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Get delivery slots failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+    return response.json() as Promise<DeliverySlotsResponse>;
+  }
+
+  async selectDeliverySlot(slotId: number, addressId?: number, unattended = false): Promise<void> {
+    let resolvedAddressId = addressId;
+    if (resolvedAddressId === undefined) {
+      const slots = await this.getDeliverySlots();
+      resolvedAddressId = slots.cartInfo.deliveryAddress?.id;
+      if (resolvedAddressId === undefined) {
+        throw new Error("No delivery address found; please specify an address ID");
+      }
+    }
+
+    const response = await this.apiPost(
+      OdaClient.SLOT_SELECT_API,
+      {
+        deliverySlotId: slotId,
+        isUnattendedDelivery: unattended,
+        inModal: true,
+        deliveryAddressId: resolvedAddressId,
+      },
+    );
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Select delivery slot failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
     }
   }
 
