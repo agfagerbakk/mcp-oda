@@ -169,7 +169,7 @@ export class OdaServer {
       inputSchema: {},
     }, this.toolHandler("delivery_addresses_list", async () => {
       const data = await this.getClient().getDeliverySlots(1, 0);
-      return this.jsonResult(data.deliveryAddresses);
+      return this.jsonResult(data.delivery_addresses);
     }));
   }
 

@@ -217,7 +217,7 @@ slotCmd
   .action(async () => {
     const client = makeClient();
     const result = await client.getDeliverySlots(1, 0);
-    console.log(JSON.stringify(result.deliveryAddresses, null, 2));
+    console.log(JSON.stringify(result.delivery_addresses, null, 2));
   });
 
 // --- logs command ---

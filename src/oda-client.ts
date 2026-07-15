@@ -590,7 +590,7 @@ export class OdaClient {
     let resolvedAddressId = addressId;
     if (resolvedAddressId === undefined) {
       const slots = await this.getDeliverySlots();
-      resolvedAddressId = slots.cartInfo.deliveryAddress?.id;
+      resolvedAddressId = slots.cart_info.delivery_address?.id;
       if (resolvedAddressId === undefined) {
         throw new Error("No delivery address found; please specify an address ID");
       }

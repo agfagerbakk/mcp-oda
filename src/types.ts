@@ -53,42 +53,46 @@ export interface RecipeDetail {
   image_url?: string;
 }
 
+// The Oda slot-picker API returns snake_case keys (verified at runtime), so these
+// types mirror that exactly. Do not "camelCase" them — the fields are accessed by
+// their real wire names.
 export interface DeliveryAddress {
   id: number;
-  addressDisplayFull: string;
-  isPrimary: boolean;
-  isDeliveryAvailable?: boolean;
+  address_display?: string;
+  address_display_full: string;
+  is_primary: boolean;
+  is_delivery_available?: boolean;
 }
 
 export interface DeliverySlot {
   id: number;
-  routeGroup: number;
-  routeGroupStr: string;
-  openDatetime: string;
-  closeDatetime: string;
-  cutoffTime: string;
-  isSelected: boolean;
-  isFull: boolean;
+  route_group: number;
+  route_group_str: string;
+  open_datetime: string;
+  close_datetime: string;
+  cutoff_time: string;
+  is_selected: boolean;
+  is_full: boolean;
   price: string;
-  isUnavailable: boolean;
-  unavailableDescription: string | null;
-  isCheapest: boolean;
+  is_unavailable: boolean;
+  unavailable_description: string | null;
+  is_cheapest: boolean;
 }
 
 export interface CartDeliveryInfo {
-  deliverySlot: number | null;
-  isUnattendedDelivery: boolean;
-  deliveryAddress: DeliveryAddress | null;
+  delivery_slot: number | null;
+  is_unattended_delivery: boolean;
+  delivery_address: DeliveryAddress | null;
   country: string;
 }
 
 export interface DeliverySlotsResponse {
-  deliverySlots: DeliverySlot[];
-  hasEarlier: boolean;
-  hasLater: boolean;
-  fromIndex: number;
-  cartInfo: CartDeliveryInfo;
-  deliveryAddresses: DeliveryAddress[];
-  validatorMessages: string[];
-  timeZone: string;
+  delivery_slots: DeliverySlot[];
+  has_earlier: boolean;
+  has_later: boolean;
+  from_index: number;
+  cart_info: CartDeliveryInfo;
+  delivery_addresses: DeliveryAddress[];
+  validator_messages: string[];
+  time_zone: string;
 }
