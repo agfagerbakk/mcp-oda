@@ -171,6 +171,71 @@ export class OdaServer {
       const data = await this.getClient().getDeliverySlots(1, 0);
       return this.jsonResult(data.delivery_addresses);
     }));
+
+    this.mcpServer.registerTool("list_all", {
+      description: "List all saved product lists (Oda's reusable shopping lists, distinct from the cart).",
+    }, this.toolHandler("list_all", async () => {
+      return this.jsonResult(await this.getClient().getProductLists());
+    }));
+
+    this.mcpServer.registerTool("list_get", {
+      description: "Get a saved product list's contents by list ID.",
+      inputSchema: { id: z.number() },
+    }, this.toolHandler("list_get", async ({ id }) => {
+      return this.jsonResult(await this.getClient().getProductList(id));
+    }));
+
+    this.mcpServer.registerTool("list_create", {
+      description: "Create a new saved product list.",
+      inputSchema: { title: z.string(), description: z.string().optional() },
+    }, this.toolHandler("list_create", async ({ title, description }) => {
+      return this.jsonResult(await this.getClient().createProductList(title, description));
+    }));
+
+    this.mcpServer.registerTool("list_rename", {
+      description: "Rename a saved product list or change its description.",
+      inputSchema: {
+        id: z.number(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+      },
+    }, this.toolHandler("list_rename", async ({ id, title, description }) => {
+      return this.jsonResult(await this.getClient().renameProductList(id, { title, description }));
+    }));
+
+    this.mcpServer.registerTool("list_delete", {
+      description: "Delete a saved product list.",
+      inputSchema: { id: z.number() },
+    }, this.toolHandler("list_delete", async ({ id }) => {
+      await this.getClient().deleteProductList(id);
+      return this.textResult("List deleted");
+    }));
+
+    this.mcpServer.registerTool("list_add_products", {
+      description: "Add products to a saved list by product ID and quantity.",
+      inputSchema: {
+        id: z.number(),
+        items: z.array(z.object({ product_id: z.number(), quantity: z.number() })),
+      },
+    }, this.toolHandler("list_add_products", async ({ id, items }) => {
+      return this.jsonResult(await this.getClient().addProductsToList(id, items));
+    }));
+
+    this.mcpServer.registerTool("list_remove_product", {
+      description: "Remove a product from a saved list by product ID.",
+      inputSchema: { id: z.number(), product_id: z.number() },
+    }, this.toolHandler("list_remove_product", async ({ id, product_id }) => {
+      await this.getClient().removeProductFromList(id, product_id);
+      return this.textResult("Product removed from list");
+    }));
+
+    this.mcpServer.registerTool("list_add_to_cart", {
+      description: "Add every item in a saved list to the cart in one go.",
+      inputSchema: { id: z.number() },
+    }, this.toolHandler("list_add_to_cart", async ({ id }) => {
+      await this.getClient().addProductListToCart(id);
+      return this.textResult("List added to cart");
+    }));
   }
 
   async start() {

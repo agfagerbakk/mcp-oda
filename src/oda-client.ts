@@ -7,6 +7,8 @@ import {
   RecipePage,
   RecipeDetail,
   DeliverySlotsResponse,
+  ProductListSummary,
+  ProductListDetail,
 } from "./types.js";
 import fs from "fs";
 
@@ -17,6 +19,7 @@ export class OdaClient {
   static CART_ITEMS_API = "https://oda.com/api/v1/cart/items/";
   static SLOT_PICKER_API = "https://oda.com/api/v1/slot-picker/slots/";
   static SLOT_SELECT_API = "https://oda.com/api/v1/slot-picker/info/";
+  static PRODUCT_LISTS_API = "https://oda.com/api/v1/product-lists/";
 
   private cookies: Record<string, string> = {};
   private readonly headers: Record<string, string>;
@@ -344,38 +347,31 @@ export class OdaClient {
     }
   }
 
-  private parseCartApi(data: any): CartItem[] {
-    const items: CartItem[] = [];
+  // Shared by cart and product-list responses: both nest a Django-side
+  // (snake_case) product under an {product, quantity} wrapper.
+  private parseWireItem(item: any): CartItem {
+    const product = item.product || {};
+    const unitPriceUnit = product.unit_price_quantity_abbreviation || "";
 
+    return {
+      id: product.id,
+      name: product.full_name || product.name || "Unknown Product",
+      subtitle: product.name_extra || "",
+      quantity: item.quantity || 1,
+      price: parseFloat(product.gross_price) || 0,
+      relative_price: parseFloat(product.gross_unit_price) || 0,
+      relative_price_unit: unitPriceUnit ? `/${unitPriceUnit}` : "",
+    };
+  }
+
+  private parseCartApi(data: any): CartItem[] {
     // Items can be at top-level or nested under groups
     const rawItems: any[] = data.items || [];
     for (const group of data.groups || []) {
       rawItems.push(...(group.items || []));
     }
 
-    for (const item of rawItems) {
-      const product = item.product || {};
-      const productId = product.id;
-      const name = product.full_name || product.name || "Unknown Product";
-      const subtitle = product.name_extra || "";
-      const quantity = item.quantity || 1;
-      const price = parseFloat(product.gross_price) || 0;
-      const unitPrice = parseFloat(product.gross_unit_price) || 0;
-      const unitPriceUnit =
-        product.unit_price_quantity_abbreviation || "";
-
-      items.push({
-        id: productId,
-        name,
-        subtitle,
-        quantity,
-        price,
-        relative_price: unitPrice,
-        relative_price_unit: unitPriceUnit ? `/${unitPriceUnit}` : "",
-      });
-    }
-
-    return items;
+    return rawItems.map((item) => this.parseWireItem(item));
   }
 
   async addToCart(productId: number, count = 1): Promise<void> {
@@ -608,6 +604,125 @@ export class OdaClient {
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Select delivery slot failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+  }
+
+  // --- Product list methods ---
+  //
+  // Oda calls these "product lists" internally (URL: /no/account/lists/); the
+  // UI label is "Lister". Saved, reusable groups of products (distinct from the
+  // cart) that you can create, edit, and re-add to the cart in bulk.
+
+  private parseProductListSummary(data: any): ProductListSummary {
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description || "",
+      number_of_products: data.number_of_products || 0,
+      total_quantity: data.total_quantity || 0,
+    };
+  }
+
+  async getProductLists(): Promise<ProductListSummary[]> {
+    const response = await this.apiGet(OdaClient.PRODUCT_LISTS_API);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Get product lists failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+    const data = await response.json();
+    return (data.results || []).map((r: any) => this.parseProductListSummary(r));
+  }
+
+  async getProductList(id: number): Promise<ProductListDetail> {
+    const response = await this.apiGet(`${OdaClient.PRODUCT_LISTS_API}${id}/`);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Get product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+    const data = await response.json();
+    return {
+      ...this.parseProductListSummary(data),
+      items: (data.items || []).map((item: any) => this.parseWireItem(item)),
+    };
+  }
+
+  async createProductList(title: string, description = ""): Promise<ProductListSummary> {
+    const response = await this.apiPost(OdaClient.PRODUCT_LISTS_API, { title, description });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Create product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+    return this.parseProductListSummary(await response.json());
+  }
+
+  async renameProductList(
+    id: number,
+    fields: { title?: string; description?: string },
+  ): Promise<ProductListSummary> {
+    const response = await this.apiPost(`${OdaClient.PRODUCT_LISTS_API}${id}/`, fields);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Rename product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+    return this.parseProductListSummary(await response.json());
+  }
+
+  async deleteProductList(id: number): Promise<void> {
+    const response = await this.apiDelete(`${OdaClient.PRODUCT_LISTS_API}${id}/`);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Delete product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+  }
+
+  /** Add products to a list. Quantities are additive with whatever is already there. */
+  async addProductsToList(
+    id: number,
+    items: { product_id: number; quantity: number }[],
+  ): Promise<ProductListDetail> {
+    const response = await this.apiPost(`${OdaClient.PRODUCT_LISTS_API}${id}/products/`, items);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Add products to list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+    const data = await response.json();
+    return {
+      ...this.parseProductListSummary(data),
+      items: (data.items || []).map((item: any) => this.parseWireItem(item)),
+    };
+  }
+
+  /**
+   * Remove a product from a list entirely. The API tracks quantity as a delta,
+   * so removal requires posting the negative of the current quantity together
+   * with `delete: true` (a zero-quantity delta or a delta that doesn't reach
+   * exactly zero just leaves a zero-quantity row instead of dropping it).
+   */
+  async removeProductFromList(id: number, productId: number): Promise<void> {
+    const list = await this.getProductList(id);
+    const item = list.items.find((i) => i.id === productId);
+    if (!item) return;
+
+    const response = await this.apiPost(`${OdaClient.PRODUCT_LISTS_API}${id}/products/`, [
+      { product_id: productId, quantity: -item.quantity, delete: true },
+    ]);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Remove product from list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    }
+  }
+
+  /** Add every item in a saved list to the cart in one shot. */
+  async addProductListToCart(id: number): Promise<void> {
+    const list = await this.getProductList(id);
+    if (!list.items.length) return;
+
+    const response = await this.apiPost(OdaClient.CART_ITEMS_API, {
+      items: list.items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Add list to cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
     }
   }
 

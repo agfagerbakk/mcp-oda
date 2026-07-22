@@ -167,6 +167,46 @@ describe("Oda Integration Tests", () => {
         expect(typeof result.deliveryAddresses[0].addressDisplayFull).toBe("string");
       }
     }, 30000);
+
+    it("should create, populate, rename, and delete a product list", async () => {
+      const searchResults = await authClient.searchProducts("salt");
+      const productId = searchResults.items[0].id;
+
+      const created = await authClient.createProductList("__integration_test_list__");
+      expect(created.id).toBeGreaterThan(0);
+      expect(created.number_of_products).toBe(0);
+
+      await authClient.addProductsToList(created.id, [{ product_id: productId, quantity: 2 }]);
+      const withItem = await authClient.getProductList(created.id);
+      expect(withItem.items.some((i) => i.id === productId && i.quantity === 2)).toBe(true);
+
+      const renamed = await authClient.renameProductList(created.id, { title: "__renamed__" });
+      expect(renamed.title).toBe("__renamed__");
+
+      await authClient.removeProductFromList(created.id, productId);
+      const withoutItem = await authClient.getProductList(created.id);
+      expect(withoutItem.items.some((i) => i.id === productId)).toBe(false);
+
+      await authClient.deleteProductList(created.id);
+      const allLists = await authClient.getProductLists();
+      expect(allLists.some((l) => l.id === created.id)).toBe(false);
+    }, 60000);
+
+    it("should add a product list's contents to the cart", async () => {
+      const searchResults = await authClient.searchProducts("salt");
+      const productId = searchResults.items[0].id;
+
+      const created = await authClient.createProductList("__integration_test_cart_list__");
+      await authClient.addProductsToList(created.id, [{ product_id: productId, quantity: 1 }]);
+
+      await authClient.addProductListToCart(created.id);
+      const cart = await authClient.getCartContents();
+      expect(cart.some((item) => item.id === productId)).toBe(true);
+
+      // Clean up: remove from cart and delete the test list.
+      await authClient.removeFromCart(productId);
+      await authClient.deleteProductList(created.id);
+    }, 60000);
   });
 
   it("should dump page data", async () => {

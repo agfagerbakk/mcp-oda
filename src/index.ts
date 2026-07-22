@@ -220,6 +220,90 @@ slotCmd
     console.log(JSON.stringify(result.delivery_addresses, null, 2));
   });
 
+// --- list commands (saved product lists, distinct from the cart) ---
+const listCmd = program.command("list").description("Saved product list commands");
+
+listCmd
+  .command("all")
+  .description("List all saved product lists")
+  .action(async () => {
+    const client = makeClient();
+    const result = await client.getProductLists();
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+listCmd
+  .command("get <id>")
+  .description("Get a saved product list's contents by ID")
+  .action(async (id: string) => {
+    const client = makeClient();
+    const result = await client.getProductList(parseInt(id));
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+listCmd
+  .command("create <title>")
+  .description("Create a new saved product list")
+  .option("--description <text>", "Description", "")
+  .action(async (title: string, cmdOpts) => {
+    const client = makeClient();
+    const result = await client.createProductList(title, cmdOpts.description);
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+listCmd
+  .command("rename <id>")
+  .description("Rename a saved product list or change its description")
+  .option("--title <text>", "New title")
+  .option("--description <text>", "New description")
+  .action(async (id: string, cmdOpts) => {
+    const client = makeClient();
+    const result = await client.renameProductList(parseInt(id), {
+      title: cmdOpts.title,
+      description: cmdOpts.description,
+    });
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+listCmd
+  .command("delete <id>")
+  .description("Delete a saved product list")
+  .action(async (id: string) => {
+    const client = makeClient();
+    await client.deleteProductList(parseInt(id));
+    console.log("List deleted.");
+  });
+
+listCmd
+  .command("add <id> <productId>")
+  .description("Add a product to a saved list by ID")
+  .option("--count <number>", "Quantity to add", "1")
+  .action(async (id: string, productId: string, cmdOpts) => {
+    const client = makeClient();
+    const result = await client.addProductsToList(parseInt(id), [
+      { product_id: parseInt(productId), quantity: parseInt(cmdOpts.count) },
+    ]);
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+listCmd
+  .command("remove <id> <productId>")
+  .description("Remove a product from a saved list by ID")
+  .action(async (id: string, productId: string) => {
+    const client = makeClient();
+    await client.removeProductFromList(parseInt(id), parseInt(productId));
+    console.log("Product removed from list.");
+  });
+
+listCmd
+  .command("add-to-cart <id>")
+  .description("Add every item in a saved list to the cart")
+  .action(async (id: string) => {
+    const client = makeClient();
+    await client.addProductListToCart(parseInt(id));
+    console.log("List added to cart.");
+  });
+
 // --- logs command ---
 program
   .command("logs")

@@ -11,10 +11,9 @@
   A Model Context Protocol (MCP) server for interacting with <a href="https://oda.com">oda.com</a>
 </p>
 
-If this project is just what you needed and/or has been helpful to you, please consider buying
-me a coffee ☕
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/gbbirkisson)
+> [!NOTE]
+> This is a fork of [`gbbirkisson/mcp-oda`](https://github.com/gbbirkisson/mcp-oda), extended with
+> delivery-slot support (and more). See the original repo for the upstream project.
 
 <h2>Table of contents</h2>
 
@@ -42,6 +41,8 @@ This MCP server provides tools to programmatically interact with Oda's grocery s
 - **Browse recipes** - Search, filter, and view recipe details
 - **Manage shopping cart** - View cart contents, add/remove items, add recipe ingredients
 - **Delivery slots** - List available delivery slots, select a slot, and list delivery addresses
+- **Saved product lists** - Create, rename, delete, and manage Oda's saved lists ("Lister"),
+  and add a whole list to the cart in one go
 - **CLI access** - All operations available as CLI subcommands in addition to MCP tools
 - **Session persistence** - Maintains login session across restarts
 
@@ -70,7 +71,7 @@ npx github:agfagerbakk/mcp-oda auth user
 
 ### CLI Commands
 
-Running `npx github:gbbirkisson/mcp-oda` with no arguments prints help. The `mcp` subcommand
+Running `npx github:agfagerbakk/mcp-oda` with no arguments prints help. The `mcp` subcommand
 starts the MCP server. All other operations are available as subcommands:
 
 ```bash
@@ -101,6 +102,16 @@ npx github:agfagerbakk/mcp-oda recipe search pizza
 npx github:agfagerbakk/mcp-oda recipe details 123
 npx github:agfagerbakk/mcp-oda recipe add 123 --portions 4
 npx github:agfagerbakk/mcp-oda recipe remove 123
+
+# Saved product lists
+npx github:agfagerbakk/mcp-oda list all
+npx github:agfagerbakk/mcp-oda list get 442221
+npx github:agfagerbakk/mcp-oda list create "Weekly essentials" --description "Stuff we always buy"
+npx github:agfagerbakk/mcp-oda list rename 442221 --title "Essentials"
+npx github:agfagerbakk/mcp-oda list delete 442221
+npx github:agfagerbakk/mcp-oda list add 442221 132 --count 2
+npx github:agfagerbakk/mcp-oda list remove 442221 132
+npx github:agfagerbakk/mcp-oda list add-to-cart 442221
 
 # Authentication
 npx github:agfagerbakk/mcp-oda auth login --user your@email.com --pass yourpassword

@@ -96,3 +96,15 @@ export interface DeliverySlotsResponse {
   validator_messages: string[];
   time_zone: string;
 }
+
+export interface ProductListSummary {
+  id: number;
+  title: string;
+  description: string;
+  number_of_products: number;
+  total_quantity: number;
+}
+
+export interface ProductListDetail extends ProductListSummary {
+  items: CartItem[];
+}
