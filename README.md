@@ -43,6 +43,9 @@ This MCP server provides tools to programmatically interact with Oda's grocery s
 - **Delivery slots** - List available delivery slots, select a slot, and list delivery addresses
 - **Saved product lists** - Create, rename, delete, and manage Oda's saved lists ("Lister"),
   and add a whole list to the cart in one go
+- **Self-authored recipes ("dinner lists")** - The same list API with `is_dinner_list` set: a
+  custom recipe with free-text cooking instructions, its own page under Oda's Recipes -> Your
+  Dinners, and one-call add-to-cart
 - **CLI access** - All operations available as CLI subcommands in addition to MCP tools
 - **Session persistence** - Maintains login session across restarts
 
@@ -112,6 +115,11 @@ npx github:agfagerbakk/mcp-oda list delete 442221
 npx github:agfagerbakk/mcp-oda list add 442221 132 --count 2
 npx github:agfagerbakk/mcp-oda list remove 442221 132
 npx github:agfagerbakk/mcp-oda list add-to-cart 442221
+
+# Self-authored recipes (dinner lists) — same "list" commands, plus --dinner
+npx github:agfagerbakk/mcp-oda list create "Taco Tuesday" --description "1. Brown the beef. 2. Warm tortillas." --dinner
+npx github:agfagerbakk/mcp-oda list rename 442221 --dinner true
+npx github:agfagerbakk/mcp-oda list rename 442221 --dinner false
 
 # Authentication
 npx github:agfagerbakk/mcp-oda auth login --user your@email.com --pass yourpassword

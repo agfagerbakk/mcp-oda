@@ -243,24 +243,27 @@ listCmd
 
 listCmd
   .command("create <title>")
-  .description("Create a new saved product list")
-  .option("--description <text>", "Description", "")
+  .description("Create a new saved product list (or a dinner/recipe with --dinner)")
+  .option("--description <text>", "Description (or cooking instructions for a dinner)", "")
+  .option("--dinner", "Create as a dinner list (self-authored recipe)", false)
   .action(async (title: string, cmdOpts) => {
     const client = makeClient();
-    const result = await client.createProductList(title, cmdOpts.description);
+    const result = await client.createProductList(title, cmdOpts.description, cmdOpts.dinner);
     console.log(JSON.stringify(result, null, 2));
   });
 
 listCmd
   .command("rename <id>")
-  .description("Rename a saved product list or change its description")
+  .description("Rename a saved product list/dinner, change its description, or convert it to/from a dinner")
   .option("--title <text>", "New title")
   .option("--description <text>", "New description")
+  .option("--dinner <bool>", "Set is_dinner_list (true/false)")
   .action(async (id: string, cmdOpts) => {
     const client = makeClient();
     const result = await client.renameProductList(parseInt(id), {
       title: cmdOpts.title,
       description: cmdOpts.description,
+      isDinnerList: cmdOpts.dinner === undefined ? undefined : cmdOpts.dinner === "true",
     });
     console.log(JSON.stringify(result, null, 2));
   });

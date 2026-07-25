@@ -173,34 +173,48 @@ export class OdaServer {
     }));
 
     this.mcpServer.registerTool("list_all", {
-      description: "List all saved product lists (Oda's reusable shopping lists, distinct from the cart).",
+      description:
+        "List all saved product lists (Oda's reusable shopping lists, distinct from the cart) " +
+        "and dinner lists (self-authored recipes) — check is_dinner_list on each to tell them apart.",
     }, this.toolHandler("list_all", async () => {
       return this.jsonResult(await this.getClient().getProductLists());
     }));
 
     this.mcpServer.registerTool("list_get", {
-      description: "Get a saved product list's contents by list ID.",
+      description: "Get a saved product list's or dinner/recipe's contents by ID.",
       inputSchema: { id: z.number() },
     }, this.toolHandler("list_get", async ({ id }) => {
       return this.jsonResult(await this.getClient().getProductList(id));
     }));
 
     this.mcpServer.registerTool("list_create", {
-      description: "Create a new saved product list.",
-      inputSchema: { title: z.string(), description: z.string().optional() },
-    }, this.toolHandler("list_create", async ({ title, description }) => {
-      return this.jsonResult(await this.getClient().createProductList(title, description));
+      description:
+        "Create a new saved product list. Set is_dinner_list=true to create a self-authored recipe " +
+        "instead (shows up under Oda's Recipes -> Your Dinners on the site); pass the recipe's cooking " +
+        "instructions as free text in `description`.",
+      inputSchema: {
+        title: z.string(),
+        description: z.string().optional(),
+        is_dinner_list: z.boolean().optional(),
+      },
+    }, this.toolHandler("list_create", async ({ title, description, is_dinner_list }) => {
+      return this.jsonResult(await this.getClient().createProductList(title, description, is_dinner_list));
     }));
 
     this.mcpServer.registerTool("list_rename", {
-      description: "Rename a saved product list or change its description.",
+      description:
+        "Rename a saved product list, change its description (or a recipe's cooking instructions), " +
+        "or convert it to/from a dinner list (is_dinner_list).",
       inputSchema: {
         id: z.number(),
         title: z.string().optional(),
         description: z.string().optional(),
+        is_dinner_list: z.boolean().optional(),
       },
-    }, this.toolHandler("list_rename", async ({ id, title, description }) => {
-      return this.jsonResult(await this.getClient().renameProductList(id, { title, description }));
+    }, this.toolHandler("list_rename", async ({ id, title, description, is_dinner_list }) => {
+      return this.jsonResult(
+        await this.getClient().renameProductList(id, { title, description, isDinnerList: is_dinner_list }),
+      );
     }));
 
     this.mcpServer.registerTool("list_delete", {

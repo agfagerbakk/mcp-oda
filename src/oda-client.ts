@@ -612,6 +612,11 @@ export class OdaClient {
   // Oda calls these "product lists" internally (URL: /no/account/lists/); the
   // UI label is "Lister". Saved, reusable groups of products (distinct from the
   // cart) that you can create, edit, and re-add to the cart in bulk.
+  //
+  // Setting is_dinner_list turns the SAME object into a self-authored recipe —
+  // it gets its own page under Oda's Recipes -> Your Dinners, and `description`
+  // doubles as free-text cooking instructions. It's toggleable after creation
+  // too (confirmed against the real API), not just at creation time.
 
   private parseProductListSummary(data: any): ProductListSummary {
     return {
@@ -620,6 +625,7 @@ export class OdaClient {
       description: data.description || "",
       number_of_products: data.number_of_products || 0,
       total_quantity: data.total_quantity || 0,
+      is_dinner_list: !!data.is_dinner_list,
     };
   }
 
@@ -646,8 +652,16 @@ export class OdaClient {
     };
   }
 
-  async createProductList(title: string, description = ""): Promise<ProductListSummary> {
-    const response = await this.apiPost(OdaClient.PRODUCT_LISTS_API, { title, description });
+  async createProductList(
+    title: string,
+    description = "",
+    isDinnerList = false,
+  ): Promise<ProductListSummary> {
+    const response = await this.apiPost(OdaClient.PRODUCT_LISTS_API, {
+      title,
+      description,
+      is_dinner_list: isDinnerList,
+    });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Create product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
@@ -657,9 +671,16 @@ export class OdaClient {
 
   async renameProductList(
     id: number,
-    fields: { title?: string; description?: string },
+    fields: { title?: string; description?: string; isDinnerList?: boolean },
   ): Promise<ProductListSummary> {
-    const response = await this.apiPost(`${OdaClient.PRODUCT_LISTS_API}${id}/`, fields);
+    // The API requires `title` on every update, even one that only changes the
+    // description — fetch the current one first so callers can update just one field.
+    const title = fields.title ?? (await this.getProductList(id)).title;
+    const response = await this.apiPost(`${OdaClient.PRODUCT_LISTS_API}${id}/`, {
+      title,
+      description: fields.description,
+      ...(fields.isDinnerList !== undefined ? { is_dinner_list: fields.isDinnerList } : {}),
+    });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Rename product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
@@ -712,13 +733,17 @@ export class OdaClient {
     }
   }
 
-  /** Add every item in a saved list to the cart in one shot. */
+  /**
+   * Add every item in a saved list (or dinner/recipe) to the cart in one shot.
+   * The cart API accepts `product_list_id` directly and groups the resulting
+   * cart items under a "dinners" section for dinner lists — one call instead
+   * of fetching the list and re-posting each product individually. `quantity`
+   * here is required by the schema but has no scaling effect (verified against
+   * the real API: quantity 3 still added each ingredient at its own list qty).
+   */
   async addProductListToCart(id: number): Promise<void> {
-    const list = await this.getProductList(id);
-    if (!list.items.length) return;
-
     const response = await this.apiPost(OdaClient.CART_ITEMS_API, {
-      items: list.items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
+      items: [{ product_list_id: id, quantity: 1 }],
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");

@@ -103,6 +103,10 @@ export interface ProductListSummary {
   description: string;
   number_of_products: number;
   total_quantity: number;
+  // A "dinner list" is the same product-list object with this flag set — a
+  // self-authored recipe: it gets its own page under Oda's Recipes -> Your
+  // Dinners, and `description` doubles as free-text cooking instructions.
+  is_dinner_list: boolean;
 }
 
 export interface ProductListDetail extends ProductListSummary {

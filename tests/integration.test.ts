@@ -207,6 +207,37 @@ describe("Oda Integration Tests", () => {
       await authClient.removeFromCart(productId);
       await authClient.deleteProductList(created.id);
     }, 60000);
+
+    it("should create a dinner list (self-authored recipe), toggle the flag, and add it to the cart", async () => {
+      const searchResults = await authClient.searchProducts("salt");
+      const productId = searchResults.items[0].id;
+
+      const created = await authClient.createProductList(
+        "__integration_test_dinner__",
+        "1. Step one. 2. Step two.",
+        true,
+      );
+      expect(created.is_dinner_list).toBe(true);
+      expect(created.description).toBe("1. Step one. 2. Step two.");
+
+      await authClient.addProductsToList(created.id, [{ product_id: productId, quantity: 1 }]);
+
+      // A description-only rename must not clobber the title (the API requires
+      // title on every update; the client fetches it if the caller omits it).
+      const renamed = await authClient.renameProductList(created.id, { description: "updated steps" });
+      expect(renamed.title).toBe("__integration_test_dinner__");
+      expect(renamed.description).toBe("updated steps");
+
+      await authClient.addProductListToCart(created.id);
+      const cart = await authClient.getCartContents();
+      expect(cart.some((item) => item.id === productId)).toBe(true);
+
+      const toggledOff = await authClient.renameProductList(created.id, { isDinnerList: false });
+      expect(toggledOff.is_dinner_list).toBe(false);
+
+      await authClient.removeFromCart(productId);
+      await authClient.deleteProductList(created.id);
+    }, 60000);
   });
 
   it("should dump page data", async () => {
