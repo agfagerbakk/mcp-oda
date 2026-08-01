@@ -180,12 +180,122 @@ export class OdaClient {
     const match = html.match(
       /<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s,
     );
-    if (!match) return null;
-    try {
-      return JSON.parse(match[1]);
-    } catch {
-      return null;
+    if (match) {
+      try {
+        return JSON.parse(match[1]);
+      } catch {
+        // fall through to the App Router path below
+      }
     }
+    // Next.js App Router (13+) no longer emits a <script id="__NEXT_DATA__">
+    // blob. The dehydrated React Query cache is instead streamed as a series of
+    // self.__next_f.push([...]) RSC chunks. Reassemble those and synthesize the
+    // legacy shape so findDehydratedQuery keeps working unchanged.
+    return this.extractNextFlightData(html);
+  }
+
+  /**
+   * Recover the dehydrated React Query state from the App Router's streamed
+   * flight payload and wrap it in the legacy __NEXT_DATA__ shape
+   * ({ props: { pageProps: { dehydratedState: { queries } } } }) so all existing
+   * findDehydratedQuery("mixedSearch" / "user" / …) callers work untouched.
+   */
+  private extractNextFlightData(html: string): any | null {
+    const flight = this.reassembleNextFlight(html);
+    if (!flight) return null;
+    const queries = this.collectDehydratedQueries(flight);
+    if (queries.length === 0) return null;
+    return { props: { pageProps: { dehydratedState: { queries } } } };
+  }
+
+  /**
+   * Concatenate the string payloads of every `self.__next_f.push([...])` call
+   * into the single flight stream React streamed to the client. Each push arg
+   * is a JSON array literal like `[1,"<chunk>"]`; we join the string elements.
+   */
+  private reassembleNextFlight(html: string): string {
+    const marker = "self.__next_f.push(";
+    const parts: string[] = [];
+    let idx = 0;
+    while ((idx = html.indexOf(marker, idx)) !== -1) {
+      const parenStart = idx + marker.length - 1; // index of the '('
+      const argExpr = this.matchBalanced(html, parenStart); // '(...)' inclusive
+      if (!argExpr) {
+        idx = parenStart + 1;
+        continue;
+      }
+      idx = parenStart + argExpr.length;
+      try {
+        const arr = JSON.parse(argExpr.slice(1, -1)); // strip the parens
+        if (Array.isArray(arr)) {
+          for (const el of arr) if (typeof el === "string") parts.push(el);
+        }
+      } catch {
+        // a non-JSON push (e.g. the bootstrap `self.__next_f=[]`) — skip it
+      }
+    }
+    return parts.join("");
+  }
+
+  /**
+   * Pull every dehydrated-query entry out of the flight stream. React Query
+   * serializes its cache as one or more `"queries":[ … ]` arrays (there can be
+   * several, streamed from different Suspense boundaries), so gather them all.
+   */
+  private collectDehydratedQueries(flight: string): any[] {
+    const needle = '"queries":';
+    const queries: any[] = [];
+    let idx = 0;
+    while ((idx = flight.indexOf(needle, idx)) !== -1) {
+      const arrStart = flight.indexOf("[", idx + needle.length);
+      idx += needle.length;
+      if (arrStart === -1) continue;
+      if (flight.slice(idx, arrStart).trim() !== "") continue; // not `"queries": [`
+      const arrText = this.matchBalanced(flight, arrStart);
+      if (!arrText) continue;
+      idx = arrStart + arrText.length;
+      try {
+        const parsed = JSON.parse(arrText);
+        if (Array.isArray(parsed)) queries.push(...parsed);
+      } catch {
+        // partial/streamed fragment that isn't valid JSON on its own — skip
+      }
+    }
+    return queries;
+  }
+
+  /**
+   * From an opening delimiter (`(`, `[` or `{`) at `start`, return the balanced
+   * substring up to and including its matching close, correctly stepping over
+   * JSON string literals (and their escapes) so brackets inside strings don't
+   * throw off the depth count. Returns null if it never balances.
+   */
+  private matchBalanced(s: string, start: number): string | null {
+    const open = s[start];
+    const close = open === "(" ? ")" : open === "[" ? "]" : open === "{" ? "}" : "";
+    if (!close) return null;
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    for (let j = start; j < s.length; j++) {
+      const c = s[j];
+      if (esc) {
+        esc = false;
+        continue;
+      }
+      if (c === "\\") {
+        esc = true;
+        continue;
+      }
+      if (c === '"') {
+        inStr = !inStr;
+        continue;
+      }
+      if (inStr) continue;
+      if (c === open) depth++;
+      else if (c === close && --depth === 0) return s.slice(start, j + 1);
+    }
+    return null;
   }
 
   private extractJsonLd(html: string): any[] {
