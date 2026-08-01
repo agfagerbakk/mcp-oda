@@ -1,3 +1,12 @@
+export interface Availability {
+  /** false = sold out / cannot be ordered at all. */
+  is_available: boolean;
+  /** Oda's machine code, e.g. "available", "available_later", "sold_out". */
+  code: string;
+  /** Human note when not plainly available, e.g. "Kan leveres 4. aug" (may be ""). */
+  description: string;
+}
+
 export interface SearchResult {
   id: number;
   name: string;
@@ -5,6 +14,7 @@ export interface SearchResult {
   price: number;
   relative_price: number;
   relative_price_unit: string;
+  availability: Availability;
 }
 
 export interface ProductPage {
@@ -21,6 +31,7 @@ export interface CartItem {
   price: number;
   relative_price: number;
   relative_price_unit: string;
+  availability: Availability;
 }
 
 export interface Recipe {

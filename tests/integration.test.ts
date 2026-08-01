@@ -31,6 +31,16 @@ describe("Oda Integration Tests", () => {
     expect(results.page_url).toContain("oda.com");
   }, 30000);
 
+  it("should surface availability on every search result", async () => {
+    const results = await client.searchProducts("melk");
+    for (const item of results.items) {
+      expect(item.availability).toBeDefined();
+      expect(typeof item.availability.is_available).toBe("boolean");
+      expect(typeof item.availability.code).toBe("string");
+      expect(item.availability.code.length).toBeGreaterThan(0);
+    }
+  }, 30000);
+
   it("should support pagination", async () => {
     const firstPage = await client.searchProducts("brød");
     expect(firstPage.items.length).toBeGreaterThan(0);

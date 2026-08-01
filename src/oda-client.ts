@@ -1,4 +1,5 @@
 import {
+  Availability,
   SearchResult,
   ProductPage,
   CartItem,
@@ -172,6 +173,22 @@ export class OdaClient {
     });
     this.updateCookies(response);
     return response;
+  }
+
+  /**
+   * Normalize Oda's product availability into a stable shape. The search JSON
+   * uses camelCase (isAvailable/descriptionShort) while the REST cart API uses
+   * snake_case (is_available/description_short); accept either. Missing data is
+   * treated as available so a shape change never silently hides products.
+   */
+  private normalizeAvailability(raw: any): Availability {
+    const a = raw ?? {};
+    const isAvailable = a.isAvailable ?? a.is_available;
+    return {
+      is_available: isAvailable !== false, // default true when absent
+      code: a.code ?? (isAvailable === false ? "unavailable" : "available"),
+      description: (a.descriptionShort ?? a.description_short ?? a.description ?? "").trim(),
+    };
   }
 
   // --- HTML parsing ---
@@ -424,6 +441,7 @@ export class OdaClient {
           price,
           relative_price: unitPrice,
           relative_price_unit: unitPriceUnit ? `/${unitPriceUnit}` : "",
+          availability: this.normalizeAvailability(a.availability),
         });
       }
 
@@ -471,6 +489,7 @@ export class OdaClient {
       price: parseFloat(product.gross_price) || 0,
       relative_price: parseFloat(product.gross_unit_price) || 0,
       relative_price_unit: unitPriceUnit ? `/${unitPriceUnit}` : "",
+      availability: this.normalizeAvailability(product.availability),
     };
   }
 
