@@ -90,8 +90,16 @@ export interface DeliverySlot {
   is_cheapest: boolean;
 }
 
+export interface CartDeliverySlot {
+  id: number;
+  name?: string;
+  name_short?: string;
+  cutoff_time?: string;
+}
+
 export interface CartDeliveryInfo {
-  delivery_slot: number | null;
+  /** Object when a slot is booked (bot or Oda app), null otherwise. Never a bare number at runtime. */
+  delivery_slot: CartDeliverySlot | number | null;
   is_unattended_delivery: boolean;
   delivery_address: DeliveryAddress | null;
   country: string;
