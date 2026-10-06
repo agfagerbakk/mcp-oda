@@ -49,11 +49,18 @@ authCmd
   .command("login")
   .description("Log in with email and password")
   .option("--user <email>", "Email for login")
-  .option("--pass <password>", "Password for login")
+  .option("--pass <password>", "Password for login (visible in process list; prefer --pass-stdin)")
+  .option("--pass-stdin", "Read password from stdin (avoids exposing it via --pass)")
   .action(async (cmdOpts) => {
     const opts = program.opts();
     const server = new OdaServer(opts.dataDir);
-    await server.auth(cmdOpts.user, cmdOpts.pass);
+    let password: string | undefined = cmdOpts.pass;
+    if (cmdOpts.passStdin) {
+      password = fs.readFileSync(0, "utf-8").trim();
+    } else if (password) {
+      console.error("Warning: --pass exposes the password in the process list; prefer --pass-stdin.");
+    }
+    await server.auth(cmdOpts.user, password);
   });
 
 authCmd
