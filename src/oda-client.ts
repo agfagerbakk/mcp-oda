@@ -12,6 +12,7 @@ import {
   ProductListDetail,
 } from "./types.js";
 import fs from "fs";
+import path from "path";
 
 export class OdaClient {
   static BASE_URL = "https://oda.com/no";
@@ -60,18 +61,39 @@ export class OdaClient {
   }
 
   saveCookies() {
-    fs.writeFileSync(this.cookiePath, JSON.stringify(this.cookies, null, 2));
+    fs.mkdirSync(path.dirname(this.cookiePath), { recursive: true });
+    fs.writeFileSync(this.cookiePath, JSON.stringify(this.cookies, null, 2), { mode: 0o600 });
+    // writeFileSync mode only applies on creation; enforce on existing files too.
+    try {
+      fs.chmodSync(this.cookiePath, 0o600);
+    } catch {
+      // Best-effort: never fail requests over file permissions.
+    }
   }
 
   private updateCookies(response: Response) {
     const setCookies = response.headers.getSetCookie();
+    let changed = false;
     for (const header of setCookies) {
       const parts = header.split(";")[0];
       const eq = parts.indexOf("=");
       if (eq > 0) {
         const name = parts.substring(0, eq).trim();
         const value = parts.substring(eq + 1).trim();
-        this.cookies[name] = value;
+        if (this.cookies[name] !== value) {
+          this.cookies[name] = value;
+          changed = true;
+        }
+      }
+    }
+    // Persist refreshed sessions (e.g. rotated sessionid/csrftoken) so the
+    // login doesn't silently expire. Only when a session file already exists —
+    // never create one as a side effect of a read.
+    if (changed && fs.existsSync(this.cookiePath)) {
+      try {
+        this.saveCookies();
+      } catch {
+        // Best-effort: in-memory session is still valid for this process.
       }
     }
   }

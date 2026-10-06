@@ -267,10 +267,13 @@ export class OdaServer {
   async auth(username?: string, password?: string) {
     if (!username || !password) {
       console.error(
-        "HTTP-based auth requires --user and --pass arguments.",
+        "HTTP-based auth requires --user and a password (--pass or --pass-stdin).",
       );
       console.error(
         "Usage: mcp-oda auth login --user <email> --pass <password>",
+      );
+      console.error(
+        "   or: mcp-oda auth login --user <email> --pass-stdin < password.txt",
       );
       process.exit(1);
     }
