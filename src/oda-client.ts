@@ -959,9 +959,35 @@ export class OdaClient {
   }
 
   async checkUser(): Promise<string | null> {
-    // Use dehydrated query "user" from any page
-    const nextData = await this.fetchNextData(`${OdaClient.BASE_URL}/cart/`);
-    return this.extractUserName(nextData);
+    // Fast path: the dehydrated "user" query on the cart page. On newer Oda
+    // pages state.data is a React Flight $ref (e.g. "$39:1:props:currentUser"),
+    // not the user object, so this legitimately returns null for valid sessions.
+    try {
+      const nextData = await this.fetchNextData(`${OdaClient.BASE_URL}/cart/`);
+      const name = this.extractUserName(nextData);
+      if (name) return name;
+    } catch {
+      // Fall through to the API probe below.
+    }
+    // Robust path: an authenticated JSON API. 2xx means the cookie session is
+    // valid even when the page no longer exposes the user object.
+    try {
+      const response = await this.apiGet(OdaClient.PRODUCT_LISTS_API);
+      if (!response.ok) return null;
+      // Prefer a real name when the slot-picker exposes one.
+      try {
+        const slots = (await this.getDeliverySlots(1, 0)) as {
+          delivery_addresses?: { recipient_name?: unknown }[];
+        };
+        const recipient = slots?.delivery_addresses?.[0]?.recipient_name;
+        if (typeof recipient === "string" && recipient) return recipient;
+      } catch {
+        // Ignore — session validity is already established.
+      }
+      return "Authenticated Oda user";
+    } catch {
+      return null;
+    }
   }
 
   private extractUserName(nextData: any): string | null {
