@@ -72,7 +72,7 @@ export class OdaServer {
     }));
 
     this.mcpServer.registerTool("cart_get_contents", {
-      description: "Get the current shopping cart contents.",
+      description: "Get the current shopping cart contents with totals (label_text, product_quantity_count, display_price, total_gross_amount) and per-line item_id, line_total, and recipe group annotations.",
     }, this.toolHandler("cart_get_contents", async () => {
       return this.jsonResult(await this.getClient().getCartContents());
     }));

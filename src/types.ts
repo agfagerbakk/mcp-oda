@@ -34,6 +34,21 @@ export interface CartItem {
   availability: Availability;
 }
 
+export interface CartLine extends CartItem {
+  item_id: number;
+  line_total: number;
+  group_title?: string;
+  group_type?: string;
+}
+
+export interface Cart {
+  label_text: string;
+  product_quantity_count: number;
+  display_price: number;
+  total_gross_amount: number;
+  items: CartLine[];
+}
+
 export interface Recipe {
   id: number;
   name: string;

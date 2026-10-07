@@ -2,7 +2,9 @@ import {
   Availability,
   SearchResult,
   ProductPage,
+  Cart,
   CartItem,
+  CartLine,
   Recipe,
   RecipeFilter,
   RecipePage,
@@ -507,7 +509,7 @@ export class OdaClient {
 
   // --- Cart methods ---
 
-  async getCartContents(): Promise<CartItem[]> {
+  async getCartContents(): Promise<Cart> {
     // Cart data is not in __NEXT_DATA__, use the REST API directly
     const response = await this.apiGet(OdaClient.CART_API);
     if (response.status === 425) {
@@ -516,16 +518,19 @@ export class OdaClient {
       );
     }
     if (!response.ok) {
-      return [];
+      // Never masquerade an auth failure as an empty cart.
+      await this.throwApiError("Get cart contents", response);
     }
 
+    let data: any;
     try {
-      const data = await response.json();
-      return this.parseCartApi(data);
+      data = await response.json();
     } catch (e) {
-      console.error("Failed to parse cart API response", e);
-      return [];
+      throw new Error(
+        `Get cart contents failed: invalid JSON (${e instanceof Error ? e.message.slice(0, 120) : String(e).slice(0, 120)})`,
+      );
     }
+    return this.parseCartApi(data);
   }
 
   // Shared by cart and product-list responses: both nest a Django-side
@@ -546,14 +551,36 @@ export class OdaClient {
     };
   }
 
-  private parseCartApi(data: any): CartItem[] {
-    // Items can be at top-level or nested under groups
-    const rawItems: any[] = data.items || [];
+  private parseCartApi(data: any): Cart {
+    // Items can be at top-level or nested under groups (e.g. recipes). The
+    // list stays flat; group membership is annotated per line instead.
+    const items: CartLine[] = [];
+    const rawItems: Array<{ item: any; group?: any }> = (data.items || []).map((item: any) => ({ item }));
     for (const group of data.groups || []) {
-      rawItems.push(...(group.items || []));
+      for (const item of group.items || []) {
+        rawItems.push({ item, group });
+      }
     }
 
-    return rawItems.map((item) => this.parseWireItem(item));
+    for (const { item, group } of rawItems) {
+      const base = this.parseWireItem(item);
+      const line: CartLine = {
+        ...base,
+        item_id: item.item_id || 0,
+        line_total: parseFloat(item.display_price_total) || base.price * base.quantity,
+      };
+      if (group?.title) line.group_title = group.title;
+      if (group?.group_type) line.group_type = group.group_type;
+      items.push(line);
+    }
+
+    return {
+      label_text: data.label_text || "",
+      product_quantity_count: data.product_quantity_count || 0,
+      display_price: parseFloat(data.display_price) || 0,
+      total_gross_amount: parseFloat(data.total_gross_amount) || 0,
+      items,
+    };
   }
 
   async addToCart(productId: number, count = 1): Promise<void> {
