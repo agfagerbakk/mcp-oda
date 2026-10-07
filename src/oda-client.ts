@@ -179,6 +179,37 @@ export class OdaClient {
     return response;
   }
 
+  private async throwApiError(
+    operation: string,
+    response: Response,
+  ): Promise<never> {
+    const body = await response.text().catch(() => "");
+    const authHint =
+      response.status === 401 || response.status === 403
+        ? " (authentication may be required or expired)"
+        : "";
+    throw new Error(
+      `${operation} failed: HTTP ${response.status}${authHint}${body ? ` – ${body.slice(0, 500)}` : ""}`,
+    );
+  }
+
+  // Pagination URLs are read out of an API response body. Resolve them against
+  // the Oda origin and refuse anything off-origin, so session cookies are never
+  // sent to a host we did not intend to talk to.
+  private static resolveOdaUrl(candidate: string, what: string): string {
+    const origin = new URL(OdaClient.API_BASE).origin;
+    let resolved: URL;
+    try {
+      resolved = new URL(candidate, `${origin}/`);
+    } catch {
+      throw new Error(`Refused ${what}: ${candidate} is not a valid URL`);
+    }
+    if (resolved.origin !== origin) {
+      throw new Error(`Refused ${what}: ${candidate} is not on ${origin}`);
+    }
+    return resolved.toString();
+  }
+
   private async apiDelete(url: string): Promise<Response> {
     const csrf = this.getCsrfToken();
     const response = await fetch(url, {
@@ -531,8 +562,7 @@ export class OdaClient {
       { items: [{ product_id: productId, quantity: count }] },
     );
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Add to cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Add to cart", response);
     }
   }
 
@@ -543,8 +573,7 @@ export class OdaClient {
       `${OdaClient.BASE_URL}/cart/`,
     );
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Remove from cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Remove from cart", response);
     }
   }
 
@@ -555,8 +584,7 @@ export class OdaClient {
       `${OdaClient.BASE_URL}/cart/`,
     );
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Clear cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Clear cart", response);
     }
   }
 
@@ -705,8 +733,7 @@ export class OdaClient {
       { items },
     );
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Add recipe to cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Add recipe to cart", response);
     }
   }
 
@@ -716,8 +743,7 @@ export class OdaClient {
       { items: [{ recipe_id: recipeId, quantity: -1, delete: true }] },
     );
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Remove recipe from cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Remove recipe from cart", response);
     }
   }
 
@@ -727,8 +753,7 @@ export class OdaClient {
     const url = `${OdaClient.SLOT_PICKER_API}?num-days=${numDays}&from-index=${fromIndex}`;
     const response = await this.apiGet(url);
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Get delivery slots failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Get delivery slots", response);
     }
     return response.json() as Promise<DeliverySlotsResponse>;
   }
@@ -753,8 +778,7 @@ export class OdaClient {
       },
     );
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Select delivery slot failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Select delivery slot", response);
     }
   }
 
@@ -781,20 +805,31 @@ export class OdaClient {
   }
 
   async getProductLists(): Promise<ProductListSummary[]> {
-    const response = await this.apiGet(OdaClient.PRODUCT_LISTS_API);
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Get product lists failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+    // DRF-paginated: follow `next` so accounts with many lists are not
+    // silently truncated. Guard against pagination loops with a visited set,
+    // and refuse off-origin URLs so cookies never go elsewhere.
+    const lists: ProductListSummary[] = [];
+    const visited = new Set<string>();
+    let url: string | null = OdaClient.PRODUCT_LISTS_API;
+    while (url && !visited.has(url)) {
+      visited.add(url);
+      const response = await this.apiGet(url);
+      if (!response.ok) {
+        await this.throwApiError("Get product lists", response);
+      }
+      const data = await response.json();
+      for (const r of data.results || []) {
+        lists.push(this.parseProductListSummary(r));
+      }
+      url = data.next ? OdaClient.resolveOdaUrl(String(data.next), "saved list pagination URL") : null;
     }
-    const data = await response.json();
-    return (data.results || []).map((r: any) => this.parseProductListSummary(r));
+    return lists;
   }
 
   async getProductList(id: number): Promise<ProductListDetail> {
     const response = await this.apiGet(`${OdaClient.PRODUCT_LISTS_API}${id}/`);
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Get product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Get product list", response);
     }
     const data = await response.json();
     return {
@@ -814,8 +849,7 @@ export class OdaClient {
       is_dinner_list: isDinnerList,
     });
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Create product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Create product list", response);
     }
     return this.parseProductListSummary(await response.json());
   }
@@ -833,8 +867,7 @@ export class OdaClient {
       ...(fields.isDinnerList !== undefined ? { is_dinner_list: fields.isDinnerList } : {}),
     });
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Rename product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Rename product list", response);
     }
     return this.parseProductListSummary(await response.json());
   }
@@ -842,8 +875,7 @@ export class OdaClient {
   async deleteProductList(id: number): Promise<void> {
     const response = await this.apiDelete(`${OdaClient.PRODUCT_LISTS_API}${id}/`);
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Delete product list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Delete product list", response);
     }
   }
 
@@ -854,8 +886,7 @@ export class OdaClient {
   ): Promise<ProductListDetail> {
     const response = await this.apiPost(`${OdaClient.PRODUCT_LISTS_API}${id}/products/`, items);
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Add products to list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Add products to list", response);
     }
     const data = await response.json();
     return {
@@ -879,8 +910,7 @@ export class OdaClient {
       { product_id: productId, quantity: -item.quantity, delete: true },
     ]);
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Remove product from list failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Remove product from list", response);
     }
   }
 
@@ -897,8 +927,7 @@ export class OdaClient {
       items: [{ product_list_id: id, quantity: 1 }],
     });
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Add list to cart failed: HTTP ${response.status}${body ? ` – ${body.slice(0, 500)}` : ""}`);
+      await this.throwApiError("Add list to cart", response);
     }
   }
 
@@ -919,7 +948,14 @@ export class OdaClient {
       return true;
     }
 
-    return false;
+    // Only credential-type rejections mean "wrong username/password"; a 5xx
+    // or anything unexpected is a server problem and must not be reported as
+    // bad credentials.
+    if ([400, 401, 403].includes(response.status)) {
+      return false;
+    }
+    await this.throwApiError("Login", response);
+    return false; // unreachable, throwApiError always throws
   }
 
   async checkUser(): Promise<string | null> {

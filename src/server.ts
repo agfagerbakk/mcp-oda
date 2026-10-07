@@ -86,7 +86,7 @@ export class OdaServer {
 
     this.mcpServer.registerTool("cart_remove_item", {
       description: "Remove a product from the cart by product ID.",
-      inputSchema: { id: z.number(), count: z.number().optional() },
+      inputSchema: { id: z.number().int().positive(), count: z.number().int().positive().optional() },
     }, this.toolHandler("cart_remove_item", async ({ id, count }) => {
       await this.getClient().removeFromCart(id, count);
       return this.textResult("Item removed");
@@ -94,14 +94,14 @@ export class OdaServer {
 
     this.mcpServer.registerTool("products_search", {
       description: "Search for products on Oda.",
-      inputSchema: { query: z.string(), page: z.number().optional() },
+      inputSchema: { query: z.string(), page: z.number().int().positive().optional() },
     }, this.toolHandler("products_search", async ({ query, page }) => {
       return this.jsonResult(await this.getClient().searchProducts(query, page));
     }));
 
     this.mcpServer.registerTool("product_add_to_cart", {
       description: "Add a product to the cart by product ID.",
-      inputSchema: { id: z.number(), count: z.number().optional() },
+      inputSchema: { id: z.number().int().positive(), count: z.number().int().positive().optional() },
     }, this.toolHandler("product_add_to_cart", async ({ id, count }) => {
       await this.getClient().addToCart(id, count);
       return this.textResult("Product added");
@@ -111,7 +111,7 @@ export class OdaServer {
       description: "Search for recipes on Oda.",
       inputSchema: {
         query: z.string().optional(),
-        page: z.number().optional(),
+        page: z.number().int().positive().optional(),
         filter_ids: z.array(z.string()).optional(),
       },
     }, this.toolHandler("recipes_search", async ({ query, page, filter_ids }) => {
@@ -120,14 +120,14 @@ export class OdaServer {
 
     this.mcpServer.registerTool("recipes_get_details", {
       description: "Get recipe details by recipe ID.",
-      inputSchema: { id: z.number() },
+      inputSchema: { id: z.number().int().positive() },
     }, this.toolHandler("recipes_get_details", async ({ id }) => {
       return this.jsonResult(await this.getClient().getRecipeDetails(id));
     }));
 
     this.mcpServer.registerTool("recipe_add_to_cart", {
       description: "Add recipe ingredients to cart by recipe ID.",
-      inputSchema: { id: z.number(), portions: z.number() },
+      inputSchema: { id: z.number().int().positive(), portions: z.number().int().positive() },
     }, this.toolHandler("recipe_add_to_cart", async ({ id, portions }) => {
       await this.getClient().addRecipeToCart(id, portions);
       return this.textResult("Recipe added");
@@ -135,7 +135,7 @@ export class OdaServer {
 
     this.mcpServer.registerTool("recipe_remove_from_cart", {
       description: "Remove a recipe and its ingredients from the cart by recipe ID.",
-      inputSchema: { id: z.number() },
+      inputSchema: { id: z.number().int().positive() },
     }, this.toolHandler("recipe_remove_from_cart", async ({ id }) => {
       await this.getClient().removeRecipeFromCart(id);
       return this.textResult("Recipe removed");
@@ -144,8 +144,8 @@ export class OdaServer {
     this.mcpServer.registerTool("delivery_slots_list", {
       description: "List available delivery slots. Returns slots with day/time windows, price, availability, and delivery addresses.",
       inputSchema: {
-        num_days: z.number().optional(),
-        from_index: z.number().optional(),
+        num_days: z.number().int().positive().optional(),
+        from_index: z.number().int().min(0).optional(),
       },
     }, this.toolHandler("delivery_slots_list", async ({ num_days, from_index }) => {
       const data = await this.getClient().getDeliverySlots(num_days, from_index);
@@ -155,8 +155,8 @@ export class OdaServer {
     this.mcpServer.registerTool("delivery_slot_select", {
       description: "Select a delivery slot by slot ID.",
       inputSchema: {
-        id: z.number(),
-        address_id: z.number().optional(),
+        id: z.number().int().positive(),
+        address_id: z.number().int().positive().optional(),
         unattended: z.boolean().optional(),
       },
     }, this.toolHandler("delivery_slot_select", async ({ id, address_id, unattended }) => {
@@ -182,7 +182,7 @@ export class OdaServer {
 
     this.mcpServer.registerTool("list_get", {
       description: "Get a saved product list's or dinner/recipe's contents by ID.",
-      inputSchema: { id: z.number() },
+      inputSchema: { id: z.number().int().positive() },
     }, this.toolHandler("list_get", async ({ id }) => {
       return this.jsonResult(await this.getClient().getProductList(id));
     }));
@@ -206,7 +206,7 @@ export class OdaServer {
         "Rename a saved product list, change its description (or a recipe's cooking instructions), " +
         "or convert it to/from a dinner list (is_dinner_list).",
       inputSchema: {
-        id: z.number(),
+        id: z.number().int().positive(),
         title: z.string().optional(),
         description: z.string().optional(),
         is_dinner_list: z.boolean().optional(),
@@ -219,7 +219,7 @@ export class OdaServer {
 
     this.mcpServer.registerTool("list_delete", {
       description: "Delete a saved product list.",
-      inputSchema: { id: z.number() },
+      inputSchema: { id: z.number().int().positive() },
     }, this.toolHandler("list_delete", async ({ id }) => {
       await this.getClient().deleteProductList(id);
       return this.textResult("List deleted");
@@ -229,7 +229,7 @@ export class OdaServer {
       description: "Add products to a saved list by product ID and quantity.",
       inputSchema: {
         id: z.number(),
-        items: z.array(z.object({ product_id: z.number(), quantity: z.number() })),
+        items: z.array(z.object({ product_id: z.number().int().positive(), quantity: z.number().int().positive() })),
       },
     }, this.toolHandler("list_add_products", async ({ id, items }) => {
       return this.jsonResult(await this.getClient().addProductsToList(id, items));
@@ -237,7 +237,7 @@ export class OdaServer {
 
     this.mcpServer.registerTool("list_remove_product", {
       description: "Remove a product from a saved list by product ID.",
-      inputSchema: { id: z.number(), product_id: z.number() },
+      inputSchema: { id: z.number().int().positive(), product_id: z.number().int().positive() },
     }, this.toolHandler("list_remove_product", async ({ id, product_id }) => {
       await this.getClient().removeProductFromList(id, product_id);
       return this.textResult("Product removed from list");
@@ -245,7 +245,7 @@ export class OdaServer {
 
     this.mcpServer.registerTool("list_add_to_cart", {
       description: "Add every item in a saved list to the cart in one go.",
-      inputSchema: { id: z.number() },
+      inputSchema: { id: z.number().int().positive() },
     }, this.toolHandler("list_add_to_cart", async ({ id }) => {
       await this.getClient().addProductListToCart(id);
       return this.textResult("List added to cart");
