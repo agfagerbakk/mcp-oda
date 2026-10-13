@@ -2,6 +2,7 @@
   "name": "mcp-oda",
   "version": "0.7.0",
   "description": "Integration with Oda for searching products and managing your shopping cart.",
+  "license": "MIT",
   "main": "dist/index.js",
   "bin": {
     "mcp-oda": "dist/index.js"
